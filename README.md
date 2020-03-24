@@ -5,7 +5,7 @@ For more detail, watch this YouTube video: https://www.youtube.com/watch?v=wLWuT
 Plugins Required: Skript, skUniversal 
 
 Works with GriefPrevention - The chest won't drop in claimed areas.
-World with Multiverse (or any other world plugin) - The chest will drop in the player's current world
+Works with Multiverse (or any other world plugin) - The chest will drop in the player's current world
 Change lines 124 and 125 to the area where the crate should drop
 
 USAGE: 
