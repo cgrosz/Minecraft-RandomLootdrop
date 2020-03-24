@@ -1,0 +1,191 @@
+#
+# Random Crate Drop - Created by LuuMiz
+#
+# Plugins Required: Skript, skUniversal 
+# 
+# Works with GriefPrevention - The chest won't drop in claimed areas.
+# World with Multiverse (or any other world plugin) - The chest will drop in the player's current world
+# Change lines 124 and 125 to the area where the crate should drop
+# 
+# USAGE: 
+# every command requires permission: minecraft.op
+# put the items you want to be loaded into the crate in your inventory (not hotbar)
+# run the /lootdrop new crateName command and it will create your first crate
+# /lootdrop view crateName will list all of the items in that crate
+# /lootdrop delete crateName will remove it completely
+# /lootdrop list will display all of the current crates you have
+#
+# to actually drop a crate run /lootdrop crateName
+# keep in mind that even though you spawned the crate, it will not move while
+# the chunk is not loaded. To combat this, each time you drop a crate, it will send
+# the user a message asking if they want to TP to the crate. Just click on the text
+# in chat or run /lootdroptp. This is an easy way for an admin to get to the crate. 
+#
+# /lootdrop help will display all of this information in game
+# 
+# You can only spawn 1 crate at a time (currently bugs with multiple crates at a time)
+# There's also a 30 second wait period after a crate lands until you can spawn another
+#
+
+import:
+    us.donut.skuniversal.griefprevention.GriefPreventionHook
+    java.util.ArrayList
+
+command /lootdrop <text> [<text>] [<text>]:
+    permission: minecraft.op
+    executable by: players and console
+    trigger:
+        if arg-1 is not set: 
+            send "&c----->>> &eLOOTDROP COMMAND HELP &c<<<-----"
+            send "&6new <crateName> &f: create's new lootdrop with the contents of your inventory."
+            send "&6delete <crateName> &f: removes a lootdrop from list and view."
+            send "&6view <crateName> &f: shows the contents of a specific lootdrop."
+            send "&6<crateName> &f: releases the lootdrop with specific crate contents."
+            send "&6list &f: shows all of the lootcrates."
+            send "&c----->>> &eLOOTDROP COMMAND HELP &c<<<-----"
+            #send "&c----->>> &eCREATED BY LUUMIZ &c<<<-----"
+
+        else if arg-1 is "help": 
+            send "&c----->>> &eLOOTDROP COMMAND HELP &c<<<-----"
+            send "&6new <crateName> &f: create's new lootdrop with the contents of your inventory."
+            send "&6delete <crateName> &f: removes a lootdrop from list and view."
+            send "&6view <crateName> &f: shows the contents of a specific lootdrop."
+            send "&6<crateName> &f: releases the lootdrop with specific crate contents."
+            send "&6list &f: shows all of the lootcrates."
+            send "&c----->>> &eLOOTDROP COMMAND HELP &c<<<-----"
+            #send "&c----->>> &eCREATED BY LUUMIZ &c<<<-----"
+  
+        else if arg-1 is "new":
+            if arg-2 is set:
+                if arg-2 is "new" or "delete" or "view" or "list" or "help" or "reset":
+                    send "&c[LOOTDROP] You cannot use this name."
+                    stop
+
+                loop {lootchests::*}:
+                    if {lootchests::%loop-index%} is arg-2:
+                        send "&c[LOOTDROP] That crate name is already taken."
+                        stop
+                add arg-2 to {lootchests::*}
+                
+                #grabs the player's inventory and turns it into an array of items
+                set {_count} to 9
+                loop 27 times:
+                    add slot {_count} of player's inventory to {lootchest.%arg 2%::*}
+                    add 1 to {_count}
+                send "&e[LOOTDROP] Crate %arg 2% &ehas been created with: %{lootchest.%arg 2%::*}%"
+            else:
+                send "&c[LOOTDROP] Usage >>> /lootdrop new crateName"
+
+        else if arg-1 is "delete":
+            if arg-2 is set:
+                set {_foundDelete} to false
+                loop {lootchests::*}:
+                    if {lootchests::%loop-index%} is arg-2:
+                        set {_foundDelete} to true
+                        remove arg-2 from {lootchests::*}
+                        clear {lootchest.%arg 2%::*} 
+                        send "&e[LOOTDROP] Lootdrop %arg 2% &e.has been deleted"
+                if {_foundDelete} is false:
+                    send "&c[LOOTDROP] There is no crate named %arg 2%&c."
+            else:
+                send "&c[LOOTDROP] Usage >>> /lootdrop delete crateName"
+
+        else if arg-1 is "view":
+            if arg-2 is set:
+                set {_foundView} to false
+                loop {lootchests::*}:
+                    if {lootchests::%loop-index%} is arg-2:
+                        set {_foundView} to true
+                        send "%{lootchest.%arg 2%::*}%"
+                if {_foundView} is false:
+                    send "&c[LOOTDROP] There is no crate named %arg 2%&c."
+            else:
+                send "&c[LOOTDROP] Usage >>> /lootdrop view crateName"
+
+        else if arg-1 is "list":
+            send "&e[LOOTDROP] Crate List >>> %{lootchests::*}%"
+
+        else if arg-1 is "reset":
+            set {crateIsLive} to false
+            set {_foundCrate} to false
+            set {_chestIsOnGround} to false
+
+        else:
+            loop {lootchests::*}:
+                set {foundCrate} to false
+                if {lootchests::%loop-index%} is arg-1:
+                    if {crateIsLive} is not set:
+                        set {crateIsLive} to false
+                    if {crateIsLive} is false:
+                        set {_foundCrate} to true
+                        set {crateIsLive} to true
+
+                        #update these two lines when we expand world boarder
+                        set {_POSWORLDBOARDER} to 4000
+                        set {_NEGWORLDBOARDER} to -4000
+
+                        #this creates random coords for the chest to spawn at y250
+                        set {_x} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+                        set {_y} to 256
+                        set {_z} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+
+                        set {_lootdropWorld} to world of player
+                        set {lootdrop_location} to location({_x},{_y},{_z}, {_lootdropWorld})
+
+                        #CRATE DOES NOT FALL IN A CLAIM 
+                        set {_ids::*} to ids of the claims at {_location} 
+                        while {_ids::*} is set:
+                            set {_x} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+                            set {_z} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+                            set {_ids::*} to ids of the claims at {lootdrop_location}
+
+                        set block at {_location} to chest
+
+                        #create a location within 100 blocks of the real chest location to broadcast
+                        set {_xUpper} to {_x} + 100
+                        set {_xLower} to {_x} - 100
+                        set {_randomX} to a random integer between {_xUpper} and {_xLower}
+                        set {_zUpper} to {_z} + 100
+                        set {_zLower} to {_z} - 100
+                        set {_randomZ} to a random integer between {_zUpper} and {_zLower}
+
+                        broadcast "&f[&6&lL&e&lO&6&lO&e&lT&6&lD&e&lR&6&lO&e&lP&f] &6&lLoot Chest Dropping within 100 blocks of: x: %{_randomX}%, z: %{_randomZ}%"
+                        broadcast "&f[&6&lL&e&lO&6&lO&e&lT&6&lD&e&lR&6&lO&e&lP&f] &6&lGet there first to claim the reward!"
+
+                        #CREATE A CLICKABLE CHAT TP FOR OP WHO RUNS COMMAND
+                        send "&6[LOOTDROP] Teleport to Lootdrop? <command:/lootdroptp>&aClick Here.<reset>"
+
+                        #this brings the chest from y250 to above the first block it comes in contact with
+                        set {_chestIsOnGround} to false
+                        while {_chestIsOnGround} is false:
+                            if block below {lootdrop_location} is air:
+                                wait 20 ticks
+                                set block below {lootdrop_location} to chest
+                                wait 1 tick
+                                set block at location({_x},{_y},{_z}, {_lootdropWorld}) to air
+                                remove 1 from {_y}
+                                set {lootdrop_location} to location at location({_x},{_y},{_z}, {_lootdropWorld})
+                            else:
+                                set {_chestIsOnGround} to true
+
+                        set {_count} to 1
+                        set {_treasure} to block at {lootdrop_location}
+
+                        #fills the chest with 10 random items from the list above
+                        wait 5 ticks
+                        loop {lootchest.%arg 1%::*}:
+                            add {lootchest.%arg 1%::%{_count}%} to {_treasure}'s inventory
+                            add 1 to {_count}
+                        
+                        wait 30 seconds
+                        set {crateIsLive} to false
+                    else:
+                        send "&c[LOOTDROP] Another Crate is already falling!"
+                if {_foundCrate} is false:
+                    send "&c[LOOTDROP] There is no lootdrop named %arg-1%."
+
+
+command /lootdroptp:
+    permission: minecraft.op
+    trigger:
+        teleport player to {lootdrop_location}
