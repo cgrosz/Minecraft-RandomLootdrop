@@ -1,11 +1,10 @@
 #
 # Random Crate Drop - Created by LuuMiz
 #
-# Plugins Required: Skript, skUniversal 
+# Plugins Required: Skript, skUniversal, greifprevention, Skbee
 # 
 # Works with GriefPrevention - The chest won't drop in claimed areas.
 # World with Multiverse (or any other world plugin) - The chest will drop in the player's current world
-# Change lines 124 and 125 to the area where the crate should drop
 # 
 # USAGE: 
 # every command requires permission: minecraft.op
@@ -14,24 +13,46 @@
 # /lootdrop view crateName will list all of the items in that crate
 # /lootdrop delete crateName will remove it completely
 # /lootdrop list will display all of the current crates you have
+# /lootdrop edit allows you to change the contents of a lootdrop 
+# /lootdrop autodrop will toggle automatic lootdrop drops
+# /lootdrop settings opens a gui to change variable defaults
 #
-# to actually drop a crate run /lootdrop crateName
-# keep in mind that even though you spawned the crate, it will not move while
-# the chunk is not loaded. To combat this, each time you drop a crate, it will send
-# the user a message asking if they want to TP to the crate. Just click on the text
-# in chat or run /lootdroptp. This is an easy way for an admin to get to the crate. 
+# to actually drop a crate run /lootdrop crateName.
 #
 # /lootdrop help will display all of this information in game
 # 
-# You can only spawn 1 crate at a time (currently bugs with multiple crates at a time)
-# There's also a 30 second wait period after a crate lands until you can spawn another
+# You can only spawn 1 crate at a time
 #
 
-import:
-    us.donut.skuniversal.griefprevention.GriefPreventionHook
-    java.util.ArrayList
+options:
+    # GENERAL USAGE OPTIONS
+    prefix: &f[&6&lL&e&lO&6&lO&e&lT&6&lD&e&lR&6&lO&e&lP&f]
+    command: /lootdrop
 
-command /lootdrop <text> [<text>] [<text>]:
+on load:
+    if {lootdrop.autodrop} is not set:
+        set {lootdrop.autodrop} to true
+    if {lootdrop.autodrop.counter} is not set:
+        set {lootdrop.autodrop.counter} to 0
+    if {lootdrop.autodrop_timer_mins} is not set:
+        set {lootdrop.autodrop_timer_mins} to 120
+    if {lootdrop.pos_world_boarder} is not set:
+        set {lootdrop.pos_world_boarder} to 4000
+    if {lootdrop.neg_world_boarder} is not set:
+        set {lootdrop.neg_world_boarder} to -4000
+    if {lootdrop.despawn_timer_mins} is not set:
+        set {lootdrop.despawn_timer_mins} to 5
+    if {lootdrop.ticks_between_chest_fall} is not set:
+        set {lootdrop.ticks_between_chest_fall} to 5
+
+on tab complete of "{@command}":
+    if {lootchests::*} is set:
+        set tab completions for position 1 to "help", "new", "delete", "view", "edit", "list", "autodrop", "settings", and {lootchests::*}
+    else:
+        set tab completions for position 1 to "help", "new", "delete", "view", "edit", "list", "settings", and "autodrop"
+    set tab completions for position 2 to {lootchests::*}
+
+command {@command} <text> [<text>] [<text>]:
     permission: minecraft.op
     executable by: players and console
     trigger:
@@ -58,12 +79,12 @@ command /lootdrop <text> [<text>] [<text>]:
         else if arg-1 is "new":
             if arg-2 is set:
                 if arg-2 is "new" or "delete" or "view" or "list" or "help" or "reset":
-                    send "&c[LOOTDROP] You cannot use this name."
+                    send "{@prefix} You cannot use this name."
                     stop
 
                 loop {lootchests::*}:
                     if {lootchests::%loop-index%} is arg-2:
-                        send "&c[LOOTDROP] That crate name is already taken."
+                        send "{@prefix} That crate name is already taken."
                         stop
                 add arg-2 to {lootchests::*}
                 
@@ -72,9 +93,9 @@ command /lootdrop <text> [<text>] [<text>]:
                 loop 27 times:
                     add slot {_count} of player's inventory to {lootchest.%arg 2%::*}
                     add 1 to {_count}
-                send "&e[LOOTDROP] Crate %arg 2% &ehas been created with: %{lootchest.%arg 2%::*}%"
+                send "{@prefix} Crate %arg 2% &ehas been created with: %{lootchest.%arg 2%::*}%"
             else:
-                send "&c[LOOTDROP] Usage >>> /lootdrop new crateName"
+                send "{@prefix} Usage >>> /lootdrop new crateName"
 
         else if arg-1 is "delete":
             if arg-2 is set:
@@ -84,26 +105,104 @@ command /lootdrop <text> [<text>] [<text>]:
                         set {_foundDelete} to true
                         remove arg-2 from {lootchests::*}
                         clear {lootchest.%arg 2%::*} 
-                        send "&e[LOOTDROP] Lootdrop %arg 2% &e.has been deleted"
+                        send "{@prefix} Lootdrop %arg 2% &e.has been deleted"
                 if {_foundDelete} is false:
-                    send "&c[LOOTDROP] There is no crate named %arg 2%&c."
+                    send "{@prefix} There is no crate named %arg 2%."
             else:
-                send "&c[LOOTDROP] Usage >>> /lootdrop delete crateName"
+                send "{@prefix} Usage >>> /lootdrop delete crateName"
 
+        #else if arg-1 is "view":
+        #    if arg-2 is set:
+        #        set {_foundView} to false
+        #        loop {lootchests::*}:
+        #            if {lootchests::%loop-index%} is arg-2:
+        #                set {_foundView} to true
+        #                send "%{lootchest.%arg 2%::*}%"
+        #        if {_foundView} is false:
+        #            send "{@prefix} There is no crate named %arg 2%."
+        #    else:
+        #        send "{@prefix} Usage >>> /lootdrop view crateName"
+        
         else if arg-1 is "view":
             if arg-2 is set:
                 set {_foundView} to false
                 loop {lootchests::*}:
                     if {lootchests::%loop-index%} is arg-2:
                         set {_foundView} to true
-                        send "%{lootchest.%arg 2%::*}%"
+                        set {_chest} to chest
+                        set {_count} to 1
+                        open chest with 3 rows named "&6&lLootdrop: %arg 2%" to player
+                        set {_chestSlot} to 0
+                        loop 27 times:
+                            format slot {_chestSlot} of player with {lootchest.%arg 2%::%{_count}%} to be unstealable
+                            add 1 to {_chestSlot}
+                            add 1 to {_count}
                 if {_foundView} is false:
-                    send "&c[LOOTDROP] There is no crate named %arg 2%&c."
+                    send "{@prefix} There is no crate named %arg 2%."
             else:
-                send "&c[LOOTDROP] Usage >>> /lootdrop view crateName"
+                send "{@prefix} Usage >>> /lootdrop view crateName"
+        
+        else if arg-1 is "edit":
+            if arg-2 is set:
+                set {_foundView} to false
+                loop {lootchests::*}:
+                    if {lootchests::%loop-index%} is arg-2:
+                        set {_foundView} to true
+                        set {_chest} to chest
+                        open chest with 3 rows named "&3Edit Lootdrop: %arg 2%" to player
+                        set {_count} to 1
+                        set {_chestSlot} to 0
+                        loop 27 times:
+                            #set slot {_chestSlot} of player with {lootchest.%arg 2%::%{_count}%}
+                            set slot {_chestSlot} of current inventory of player to {lootchest.%arg 2%::%{_count}%}
+                            add 1 to {_chestSlot}
+                            add 1 to {_count}
+                if {_foundView} is false:
+                    send "{@prefix} There is no crate named %arg 2%."
+            else:
+                send "{@prefix} Usage >>> /lootdrop view crateName"
 
         else if arg-1 is "list":
-            send "&e[LOOTDROP] Crate List >>> %{lootchests::*}%"
+            #send "{@prefix} Crate List >>> %{lootchests::*}%"
+            set {_z} to size of {lootchests::*} / 9
+            set {_rows} to round up {_z}
+            open chest with {_rows} rows named "&3Lootdrops" to player
+            set {_chestSlot} to 0
+            set {_count} to 1
+            loop 9 * {_rows} times:
+                #set slot {_chestSlot} of current inventory of player to gray stained glass pane named "&6"
+                format slot {_chestSlot} of player with gray stained glass pane named "&6" to be unstealable
+                add 1 to {_chestSlot}
+                add 1 to {_count}
+
+            set {_chestSlot} to 0
+            set {_count} to 1  
+            loop size of {lootchests::*} times:
+                #set slot {_chestSlot} of current inventory of player to chest named "&r&a%{lootchests::%{_count}%}%"
+                format slot {_chestSlot} of player with chest named "&r&a%{lootchests::%{_count}%}%" to be unstealable
+                add 1 to {_chestSlot}
+                add 1 to {_count}
+        
+        else if arg-1 is "autodrop":
+            if {lootdrop.autodrop} is false:
+                set {lootdrop.autodrop} to true
+                send "{@prefix} Autodrop is enabled." to player
+            else if {lootdrop.autodrop} is true:
+                set {lootdrop.autodrop} to false
+                send "{@prefix} Autodrop is disabled." to player
+
+        else if arg-1 is "settings":
+            open chest with 1 row named "&3Lootdrop Settings" to player
+            set {_chestSlot} to 0
+            loop 9 times:
+                format slot {_chestSlot} of player with gray stained glass pane named "&6" to be unstealable
+                add 1 to {_chestSlot}
+
+            format slot 2 of player with orange stained glass named "&cAutodrop Timer" with lore "&a%{lootdrop.autodrop_timer_mins}%" to close then run [execute console command "/ldsettings autodrop %player%"]
+            format slot 3 of player with red stained glass named "&cSet Positive World Border" with lore "&a%{lootdrop.pos_world_boarder}%" to close then run [execute console command "/ldsettings posboarder %player%"]
+            format slot 4 of player with yellow stained glass named "&cSet Negative World Border" with lore "&a%{lootdrop.neg_world_boarder}%" to close then run [execute console command "/ldsettings negboarder %player%"]
+            format slot 5 of player with lime stained glass named "&cDespawn Timer" with lore "&a%{lootdrop.despawn_timer_mins}%" to close then run [execute console command "/ldsettings despawn %player%"]
+            format slot 6 of player with light blue stained glass named "&cTicks Between Chest Fall" with lore "&a%{lootdrop.ticks_between_chest_fall}%" to close then run [execute console command "/ldsettings chestfall %player%"]
 
         else if arg-1 is "reset":
             set {crateIsLive} to false
@@ -111,23 +210,20 @@ command /lootdrop <text> [<text>] [<text>]:
             set {_chestIsOnGround} to false
 
         else:
+            set {_foundCrate} to false
             loop {lootchests::*}:
-                set {foundCrate} to false
                 if {lootchests::%loop-index%} is arg-1:
                     if {crateIsLive} is not set:
                         set {crateIsLive} to false
                     if {crateIsLive} is false:
                         set {_foundCrate} to true
+                        set {crateIsGrounded} to false
                         set {crateIsLive} to true
 
-                        #update these two lines when we expand world boarder
-                        set {_POSWORLDBOARDER} to 4000
-                        set {_NEGWORLDBOARDER} to -4000
-
-                        #this creates random coords for the chest to spawn at y250
-                        set {_x} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
-                        set {_y} to 256
-                        set {_z} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+                        #this creates random coords for the chest to spawn at y319
+                        set {_x} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+                        set {_y} to 319
+                        set {_z} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
 
                         set {_lootdropWorld} to world of player
                         set {lootdrop_location} to location({_x},{_y},{_z}, {_lootdropWorld})
@@ -135,8 +231,8 @@ command /lootdrop <text> [<text>] [<text>]:
                         #CRATE DOES NOT FALL IN A CLAIM 
                         set {_ids::*} to ids of the claims at {_location} 
                         while {_ids::*} is set:
-                            set {_x} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
-                            set {_z} to a random integer between {_POSWORLDBOARDER} and {_NEGWORLDBOARDER}
+                            set {_x} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+                            set {_z} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
                             set {_ids::*} to ids of the claims at {lootdrop_location}
 
                         set block at {_location} to chest
@@ -149,23 +245,25 @@ command /lootdrop <text> [<text>] [<text>]:
                         set {_zLower} to {_z} - 100
                         set {_randomZ} to a random integer between {_zUpper} and {_zLower}
 
-                        broadcast "&f[&6&lL&e&lO&6&lO&e&lT&6&lD&e&lR&6&lO&e&lP&f] &6&lLoot Chest Dropping within 100 blocks of: x: %{_randomX}%, z: %{_randomZ}%"
-                        broadcast "&f[&6&lL&e&lO&6&lO&e&lT&6&lD&e&lR&6&lO&e&lP&f] &6&lGet there first to claim the reward!"
+                        broadcast "{@prefix} &6&lLoot Chest Dropping within 100 blocks of: x: %{_randomX}%, z: %{_randomZ}%"
+                        broadcast "{@prefix} &6&lGet there first to claim the reward!"
 
                         #CREATE A CLICKABLE CHAT TP FOR OP WHO RUNS COMMAND
-                        send "&6[LOOTDROP] Teleport to Lootdrop? <command:/lootdroptp>&aClick Here.<reset>"
+                        send "{@prefix} Teleport to Lootdrop? <command:/lootdroptp>&aClick Here.<reset>"
 
                         #this brings the chest from y250 to above the first block it comes in contact with
                         set {_chestIsOnGround} to false
                         while {_chestIsOnGround} is false:
                             if block below {lootdrop_location} is air:
-                                wait 20 ticks
+                                set {_wait} to "%{lootdrop.ticks_between_chest_fall}% ticks" parsed as timespan
+                                wait {_wait}
                                 set block below {lootdrop_location} to chest
                                 wait 1 tick
                                 set block at location({_x},{_y},{_z}, {_lootdropWorld}) to air
                                 remove 1 from {_y}
                                 set {lootdrop_location} to location at location({_x},{_y},{_z}, {_lootdropWorld})
                             else:
+                                add 1 to {lootdrop_location}
                                 set {_chestIsOnGround} to true
 
                         set {_count} to 1
@@ -177,15 +275,216 @@ command /lootdrop <text> [<text>] [<text>]:
                             add {lootchest.%arg 1%::%{_count}%} to {_treasure}'s inventory
                             add 1 to {_count}
                         
-                        wait 30 seconds
-                        set {crateIsLive} to false
-                    else:
-                        send "&c[LOOTDROP] Another Crate is already falling!"
-                if {_foundCrate} is false:
-                    send "&c[LOOTDROP] There is no lootdrop named %arg-1%."
+                        set {crateIsGrounded} to true
+            
+                        set {_waitt} to "%{lootdrop.despawn_timer_mins}% minutes" parsed as timespan
+                        wait {_waitt}
+                        if block at {lootdrop_location} is chest:
+                            set block at {lootdrop_location} to air
 
+                        set {lootdrop.autodrop.counter} to 0
+                        set {crateIsLive} to false
+                        set {_foundCrate} to false
+                        set {_chestIsOnGround} to false
+                    else:
+                        send "{@prefix} A Crate is already live!"
+                        stop
+            if {_foundCrate} is false:
+                send "{@prefix} There is no lootdrop named %arg-1%."
 
 command /lootdroptp:
     permission: minecraft.op
     trigger:
         teleport player to {lootdrop_location}
+
+on break of chest:
+    set {_testLoc} to location of block at {lootdrop_location}
+    if location of event-block is {_testLoc}:
+        if {crateIsGrounded} is false:
+            cancel event
+            send "{@prefix} This crate is still falling!" to player
+
+on right click:
+    set {_testLoc} to location of block at {lootdrop_location}
+    if location of event-block is {_testLoc}:
+        if {crateIsGrounded} is false:
+            cancel event
+            send "{@prefix} This crate is still falling!" to player
+
+# save the lootdrop edit
+on inventory close:
+    if name of event-inventory contains "&3Edit Lootdrop:":
+        set {_name::*} to name of event-inventory split at "Lootdrop: "
+        send "%{_name::2}%" to player
+        set {_count} to 1
+        set {_chestSlot} to 0
+        clear {lootchest.%{_name::2}%::*}
+        loop 27 times:
+            #  {lootchest.%{_name::2}%::%{_count}%}
+            set {_x} to slot {_chestSlot} of event-inventory
+            add {_x} to {lootchest.%{_name::2}%::*}
+            send "%{_x}%" to player
+            add 1 to {_chestSlot}
+            add 1 to {_count}
+
+# ############################################################
+#     SETTINGS FROM CHAT EVENT
+# ############################################################
+
+on chat:
+    if {lootdrop.settings.PlayerSettingAutodrop.%player's uuid%} is true:
+        set {_m} to message parsed as integer
+        if {_m} is set:
+            set {lootdrop.autodrop_timer_mins} to message
+            set {lootdrop.settings.PlayerSettingAutodrop.%player's uuid%} to false
+            send "{@prefix} Lootdrop auto timer is set to %{_m}%." to player
+            cancel event
+        else:
+            send "{@prefix} Please enter a number of minutes." to player
+            cancel event
+    else if {lootdrop.settings.PlayerSettingPosboarder.%player's uuid%} is true:
+        set {_m} to message parsed as integer
+        if {_m} is set:
+            set {lootdrop.pos_world_boarder} to message
+            set {lootdrop.settings.PlayerSettingPosboarder.%player's uuid%} to false
+            send "{@prefix} Lootdrop Positive Boarder is set to %{_m}%." to player
+            cancel event
+        else:
+            send "{@prefix} Please enter a number." to player
+            cancel event
+    else if {lootdrop.settings.PlayerSettingNegboarder.%player's uuid%} is true:
+        set {_m} to message parsed as integer
+        if {_m} is set:
+            set {lootdrop.neg_world_boarder} to message
+            set {lootdrop.settings.PlayerSettingNegboarder.%player's uuid%} to false
+            send "{@prefix} Lootdrop Negative Boarder is set to %{_m}%." to player
+            cancel event
+        else:
+            send "{@prefix} Please enter a number." to player
+            cancel event
+    else if {lootdrop.settings.PlayerSettingDespawn.%player's uuid%} is true:
+        set {_m} to message parsed as integer
+        if {_m} is set:
+            set {lootdrop.despawn_timer_mins} to message
+            set {lootdrop.settings.PlayerSettingDespawn.%player's uuid%} to false
+            send "{@prefix} Lootdrop Despawn Timer is set to %{_m}%." to player
+            cancel event
+        else:
+            send "{@prefix} Please enter a number of minutes." to player
+            cancel event
+    else if {lootdrop.settings.PlayerSettingChestFall.%player's uuid%} is true:
+        set {_m} to message parsed as integer
+        if {_m} is set:
+            set {lootdrop.ticks_between_chest_fall} to message
+            set {lootdrop.settings.PlayerSettingChestFall.%player's uuid%} to false
+            send "{@prefix} Lootdrop Chest Fall Delay is set to %{_m}%." to player
+            cancel event
+        else:
+            send "{@prefix} Please enter a number of ticks." to player
+            cancel event
+
+command /ldsettings <text> <player>:
+    executable by: console
+    trigger:
+        if arg-1 is "autodrop":
+            set {lootdrop.settings.PlayerSettingAutodrop.%arg-2's uuid%} to true
+            send "{@prefix} Type in the new Lootdrop Autodrop Timer in minutes" to arg-2
+        else if arg-1 is "posboarder":
+            set {lootdrop.settings.PlayerSettingPosboarder.%arg-2's uuid%} to true
+            send "{@prefix} Type in the new Lootdrop Positive Boarder" to arg-2
+        else if arg-1 is "negboarder":
+            set {lootdrop.settings.PlayerSettingNegboarder.%arg-2's uuid%} to true
+            send "{@prefix} Type in the new Lootdrop Negative Boarder" to arg-2
+        else if arg-1 is "despawn":
+            set {lootdrop.settings.PlayerSettingDespawn.%arg-2's uuid%} to true
+            send "{@prefix} Type in the new Lootdrop Despawn Timer in minutes" to arg-2
+        else if arg-1 is "chestfall":
+            set {lootdrop.settings.PlayerSettingChestFall.%arg-2's uuid%} to true
+            send "{@prefix} Type in the new Lootdrop Chest Fall Time in ticks" to arg-2
+
+# ########################################
+#   AUTO DROP CODE
+# ########################################
+every 1 minute:
+    add 1 to {lootdrop.autodrop.counter}
+    if "%{lootdrop.autodrop.counter}%" parsed as integer >= "%{lootdrop.autodrop_timer_mins}%" parsed as integer:
+        if {lootdrop.autodrop} is true:
+            if {crateIsLive} is not set:
+                set {crateIsLive} to false
+            if {crateIsLive} is false:
+                set {_foundCrate} to true
+                set {crateIsGrounded} to false
+                set {crateIsLive} to true
+
+                #this creates random coords for the chest to spawn at y250
+                set {_x} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+                set {_y} to 319
+                set {_z} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+
+                set {_lootdropWorld} to "dev"
+                set {lootdrop_location} to location({_x},{_y},{_z}, {_lootdropWorld})
+
+                #CRATE DOES NOT FALL IN A CLAIM 
+                set {_ids::*} to ids of the claims at {_location} 
+                while {_ids::*} is set:
+                    set {_x} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+                    set {_z} to a random integer between {lootdrop.pos_world_boarder} parsed as integer and {lootdrop.neg_world_boarder} parsed as integer
+                    set {_ids::*} to ids of the claims at {lootdrop_location}
+
+                set block at {_location} to chest
+
+                #create a location within 100 blocks of the real chest location to broadcast
+                set {_xUpper} to {_x} + 100
+                set {_xLower} to {_x} - 100
+                set {_randomX} to a random integer between {_xUpper} and {_xLower}
+                set {_zUpper} to {_z} + 100
+                set {_zLower} to {_z} - 100
+                set {_randomZ} to a random integer between {_zUpper} and {_zLower}
+
+                broadcast "{@prefix} &6&lLoot Chest Dropping within 100 blocks of: x: %{_randomX}%, z: %{_randomZ}%"
+                broadcast "{@prefix} &6&lGet there first to claim the reward!"
+
+                #CREATE A CLICKABLE CHAT TP FOR OP WHO RUNS COMMAND
+                #loop all players:
+                #    send "{@prefix}  Teleport to Lootdrop? <command:/lootdroptp>&aClick Here.<reset>" to loop-player
+
+                #this brings the chest from y250 to above the first block it comes in contact with
+                set {_chestIsOnGround} to false
+                while {_chestIsOnGround} is false:
+                    if block below {lootdrop_location} is air:
+                        set {_waittt} to "%{lootdrop.ticks_between_chest_fall}% ticks" parsed as timespan
+                        wait {_waittt}
+                        set block below {lootdrop_location} to chest
+                        wait 1 tick
+                        set block at location({_x},{_y},{_z}, {_lootdropWorld}) to air
+                        remove 1 from {_y}
+                        set {lootdrop_location} to location at location({_x},{_y},{_z}, {_lootdropWorld})
+                    else:
+                        add 1 to {lootdrop_location}
+                        set {_chestIsOnGround} to true
+
+                set {_count} to 1
+                set {_treasure} to block at {lootdrop_location}
+
+                #Gets a random lootdrop to use
+                set {_random} to random integer between 1 and size of {lootchests::*}
+                set {_randomLootdrop} to {lootchests::%{_random}%}
+
+                #fills the chest with 10 random items from the list above
+                wait 5 ticks
+                loop {lootchest.%{_randomLootdrop}%::*}:
+                    add {lootchest.%{_randomLootdrop}%::%{_count}%} to {_treasure}'s inventory
+                    add 1 to {_count}
+
+                set {crateIsGrounded} to true
+            
+                set {_waitttt} to "%{lootdrop.despawn_timer_mins}% minutes" parsed as timespan
+                wait {_waitttt}
+                if block at {lootdrop_location} is chest:
+                    set block at {lootdrop_location} to air
+
+                set {lootdrop.autodrop.counter} to 0
+                set {crateIsLive} to false
+                        
+
+            
